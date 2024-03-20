@@ -1,0 +1,206 @@
+---
+title: "Shutkevich_HW3"
+output: html_document
+date: "2024-03-19"
+---
+
+```{=html}
+<style type="text/css">
+body{
+  font-family: Helvetica;
+  font-size: 12pt;
+}
+/* Headers */
+h1, h2{
+  font-size: 14pt;
+}
+</style>
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE
+)
+#install.packages("readxl")
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+# Загрузка и преобразование данных
+
+```{r data, include=TRUE}
+
+# Загрузка данных
+pima <- read_excel("pima.xlsx")
+pima <- na.omit(pima)
+
+# Смотрим данные
+str(pima)
+```
+
+```{r comments, include=FALSE}
+#Количественные переменные: pregnant, glucose, pressure, triceps, insulin, mass, pedigree, age
+#Категориальная переменная: diabetes описывает наличие диабета ("pos" или "neg"). Переменную можно было бы преобразовать в фактор, а можно оставить как есть в нашем случае.
+```
+
+# Описательные статистики
+
+## 1. Расчет описательных статистик для количественных переменных glucose, pressure, mass
+
+```{r stat num, include=TRUE}
+
+# Расчет описательных статистик для glucose
+glucose_stats <- pima %>%
+  summarise(
+    Variable = "Glucose",
+    n = n(),
+    mean = mean(glucose, na.rm = TRUE),
+    sd = sd(glucose, na.rm = TRUE),
+    Q1 = quantile(glucose, 0.25, na.rm = TRUE),
+    Q3 = quantile(glucose, 0.75, na.rm = TRUE),
+    min = min(glucose, na.rm = TRUE),
+    max = max(glucose, na.rm = TRUE)
+  )
+
+# Расчет описательных статистик для pressure
+pressure_stats <- pima %>%
+  summarise(
+    Variable = "Pressure",
+    n = n(),
+    mean = mean(pressure, na.rm = TRUE),
+    sd = sd(pressure, na.rm = TRUE),
+    Q1 = quantile(pressure, 0.25, na.rm = TRUE),
+    Q3 = quantile(pressure, 0.75, na.rm = TRUE),
+    min = min(pressure, na.rm = TRUE),
+    max = max(pressure, na.rm = TRUE)
+  )
+
+# Расчет описательных статистик для mass
+mass_stats <- pima %>%
+  summarise(
+    Variable = "Mass",
+    n = n(),
+    mean = mean(mass, na.rm = TRUE),
+    sd = sd(mass, na.rm = TRUE),
+    Q1 = quantile(mass, 0.25, na.rm = TRUE),
+    Q3 = quantile(mass, 0.75, na.rm = TRUE),
+    min = min(mass, na.rm = TRUE),
+    max = max(mass, na.rm = TRUE)
+  )
+
+# Объединение результатов в одну таблицу
+all_stats <- bind_rows(glucose_stats, pressure_stats, mass_stats)
+
+# Вывод результатов
+print(all_stats)
+
+```
+
+## 2. Расчет описательной статистики для переменной diabetes
+
+```{r stat factor, include=TRUE}
+# Описательная статистика для переменной diabetes
+diabetes_stats <- pima %>%
+  group_by(diabetes) %>%
+  summarise(
+    Count = n(),
+    Frequency = n() / nrow(pima)
+  )
+
+# Вывод статистики для diabetes
+print(diabetes_stats)
+```
+
+## Создание на основе переменной age новой переменной age_group, отражающей возрастные группы: 21–35, 36–49 и 50+. Описательная статистика для новой переменной
+
+```{r new age_group, include=TRUE}
+# Создание новой переменной age_group
+pima <- pima %>%
+  mutate(age_group = cut(age,
+                         breaks = c(21, 35, 49, Inf),
+                         labels = c("21–35", "36–49", "50+"),
+                         right = FALSE))
+
+# Описательная статистика для переменной age_group
+age_group_stats <- pima %>%
+  group_by(age_group) %>%
+  summarise(
+    Count = n(),
+    Frequency = n() / nrow(pima)
+  )
+
+# Вывод статистики для age_group
+print(age_group_stats)
+```
+
+## 3. Определение 90% доверительного интервала для переменной pedigree
+
+```{r CI intervals, include=TRUE}
+# 90% доверительный интервал для pedigree
+pedigree_mean <- mean(pima$pedigree, na.rm = TRUE)
+pedigree_sd <- sd(pima$pedigree, na.rm = TRUE)
+n <- sum(!is.na(pima$pedigree))
+error_margin <- qt(0.95, df = n - 1) * (pedigree_sd / sqrt(n))
+ci_lower <- pedigree_mean - error_margin
+ci_upper <- pedigree_mean + error_margin
+ci <- c(ci_lower, ci_upper)
+
+# Вывод 90% доверительного интервала для pedigree
+cat("90% доверительный интервал для переменной 'pedigree': [", ci_lower, ", ", ci_upper, "]\n")
+```
+
+## 4. Построение график плотности вероятности для переменной glucose с отображением на нем среднего значения.
+
+```{r dens, include=TRUE}
+# График плотности вероятности для glucose
+ggplot(pima, aes(x = glucose)) +
+  geom_density(fill = "lightblue", alpha = 0.5) +
+  geom_vline(aes(xintercept = mean(glucose, na.rm = TRUE)), color = "red", linetype = "dashed") +
+  labs(title = "Плотность вероятности для Glucose")
+```
+
+## Построение гистограммы для той же переменной (glucose)
+
+```{r hist, include=TRUE}
+# Гистограмма для glucose
+ggplot(pima, aes(x = glucose)) +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
+  labs(title = "Гистограмма для Glucose")
+```
+
+## Построение 2-х ящиков с усами для значений pos и neg переменной diabetes
+
+```{r boxplot, include=TRUE}
+# Ящики с усами для diabetes
+ggplot(pima, aes(x = diabetes, y = glucose, fill = diabetes)) +
+  geom_boxplot() +
+  labs(title = "Ящики с усами для Glucose по Diabetes")
+
+# Ящики с усами для diabetes без отображения выбросов
+ggplot(pima, aes(x = diabetes, y = glucose, fill = diabetes)) +
+  geom_boxplot(outlier.shape = NA) +
+  labs(title = "Ящики с усами для Glucose по Diabetes (без выбросов)")
+```
+
+## 5. Построение на одном графике двух диаграмм рассеяния для наличия или отсутствия диабета. По оси X нужно представить значения обхвата трицепса, а по оси Y — массу тела. Выполнить окрашивание, заливку и группирование по переменной diabetes.
+
+```{r facet, include=TRUE}
+# Удаление строк, в которых данные по triceps или mass равны нулю
+pima_clean <- pima %>%
+  filter(triceps != 0, mass != 0)
+
+# Построение графика
+facet <- ggplot(data = pima_clean, aes(x = triceps, y = mass)) +
+  geom_point(aes(fill = factor(diabetes)), shape = 21, size = 3) +
+  scale_fill_manual(values = c("lightblue", "yellow")) +
+  facet_grid(. ~ diabetes) +
+  labs(title = "Диаграмма рассеяния для переменной diabetes",
+       x = "Обхват трицепса (triceps)", y = "Масса тела (mass)") +
+  theme_light()
+
+print(facet)
+```
